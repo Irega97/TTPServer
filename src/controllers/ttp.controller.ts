@@ -8,7 +8,8 @@ const axios = require('axios');
 
 let rsa = new classRSA;
 let keyPair: any;
-let pkp;
+let pkp: any;
+let pko: any;
 let po: any;
 let message: any;
 
@@ -30,24 +31,54 @@ async function sendKey(req: Request, res: Response){
   let proofDigest = await bc.bigintToHex(aPubKey.verify(bc.hexToBigint(req.body.signature)));
   let bodyDigest = await digest(body);
   if(bodyDigest.trim() === proofDigest.trim()) {
-      pkp = req.body.signature; //Proof public key
-      key = body.key; 
-      iv = body.iv;
-      console.log("Hola")
-      console.log("All data verified");
-      let data = {
-        po: po,
-        pkp: pkp,
-        key: key,
-        iv: iv,
-        pubKey: {
-          e: bigintToHex(keyPair.publicKey.e),
-          n: bigintToHex(keyPair.publicKey.n)
+    //Nuevos datos
+    let bodyA = { //Mensaje para el TTP
+      type: 4, 
+      src: 'TTP', 
+      dst: 'A', 
+      timestamp: Date.now()
+    };
+
+    let bodyB = {
+        type: 4,
+        src: 'TTP',
+        dst: 'B',
+        key: body.key, 
+        iv: bc.bufToHex(body.iv),
+        timestamp: Date.now() 
+    }
+
+    //Hasheamos y firmamos el mensaje
+    await digest(bodyA).then((data) => {
+      let y = keyPair.privateKey.sign(bc.hexToBigint(data));
+      pkp = bc.bigintToHex(y)
+    });
+
+    //Preparamos nuevos datos
+    let jsonA = {
+      body: bodyA, //Mensaje para TTP
+      signature: pkp, //Body para TTP firmado por el cliente
+      pubKey: { //Clave pública del cliente
+        e: bc.bigintToHex(keyPair.publicKey.e), 
+        n: bc.bigintToHex(keyPair.publicKey.n)
+      }
+    }; 
+
+    await digest(bodyB).then((data) => {
+        let y = keyPair.privateKey.sign(bc.hexToBigint(data));
+        pkp = bc.bigintToHex(y)
+      });
+    
+    let jsonB = {
+        body: bodyB, //Mensaje para TTP
+        signature: pkp, //Body para TTP firmado por el cliente
+        pubKey: { //Clave pública del cliente
+          e: bc.bigintToHex(keyPair.publicKey.e), 
+          n: bc.bigintToHex(keyPair.publicKey.n)
         }
-      } 
-      console.log(data);
-      /* axios.post('http://localhost:3000/rsa/ttp', data); */
-      return res.status(200).json(data);
+      }; 
+      axios.post('http://localhost:3000/rsa/ttp', jsonB);
+      return res.status(200).json(jsonA); 
   }
   else{
     return res.status(500).json({message: "Internal Server Error"});
