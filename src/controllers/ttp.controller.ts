@@ -44,7 +44,7 @@ async function sendKey(req: Request, res: Response){
         src: 'TTP',
         dst: 'B',
         key: body.key, 
-        iv: bc.bufToHex(body.iv),
+        /* iv: bc.bufToHex(body.iv), */
         timestamp: Date.now() 
     }
 
@@ -57,11 +57,7 @@ async function sendKey(req: Request, res: Response){
     //Preparamos nuevos datos
     let jsonA = {
       body: bodyA, //Mensaje para TTP
-      signature: pkp, //Body para TTP firmado por el cliente
-      pubKey: { //Clave pública del cliente
-        e: bc.bigintToHex(keyPair.publicKey.e), 
-        n: bc.bigintToHex(keyPair.publicKey.n)
-      }
+      signature: pkp //Body para TTP firmado por el cliente
     }; 
 
     await digest(bodyB).then((data) => {
@@ -71,11 +67,7 @@ async function sendKey(req: Request, res: Response){
     
     let jsonB = {
         body: bodyB, //Mensaje para TTP
-        signature: pkp, //Body para TTP firmado por el cliente
-        pubKey: { //Clave pública del cliente
-          e: bc.bigintToHex(keyPair.publicKey.e), 
-          n: bc.bigintToHex(keyPair.publicKey.n)
-        }
+        signature: pkp //Body para TTP firmado por el cliente
       }; 
       axios.post('http://localhost:3000/rsa/ttp', jsonB);
       return res.status(200).json(jsonA); 
@@ -89,4 +81,14 @@ async function digest(obj: any) {
     return await sha.digest(obj,'SHA-256');
 }
 
-export default {rsaInit, sendKey}
+async function sendPubKey(req: Request, res: Response){
+  let data = {
+      pubKey: { //Clave pública del cliente
+      e: bc.bigintToHex(keyPair.publicKey.e), 
+      n: bc.bigintToHex(keyPair.publicKey.n)
+    }
+  }
+  return res.status(200).json(data);
+}
+
+export default {rsaInit, sendKey, sendPubKey}
